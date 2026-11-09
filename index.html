@@ -30,6 +30,21 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
 .cols{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:600px){.cols{grid-template-columns:1fr 1fr}}
 .col-sec{display:flex;flex-direction:column;gap:6px}
+
+.foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.like{position:relative;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 10px;border-radius:999px;transition:transform .15s,border-color .2s}
+.like[hidden]{display:none}
+.like:hover{border-color:#e0457b}
+.like:active{transform:scale(.96)}
+.like .heart{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;transition:fill .2s,stroke .2s}
+.like.on{cursor:default;border-color:#e0457b}
+.like.on .heart{fill:#e0457b;stroke:#e0457b;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.like .cnt{font-variant-numeric:tabular-nums;color:var(--mut);padding-left:8px;border-left:1px solid var(--line)}
+.pt{position:absolute;left:19px;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#e0457b;pointer-events:none;animation:fly .7s ease-out forwards}
+.foot .msg{font-size:11px;color:var(--mut)}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes fly{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
+@media(prefers-reduced-motion:reduce){.like.on .heart,.pt{animation:none}.pt{display:none}}
 </style>
 </head>
 <body>
@@ -78,6 +93,16 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
     <div id="info"></div>
    </div>
   </div>
+  <hr>
+  <div class="foot">
+   <button class="like" id="like" type="button" aria-pressed="false" hidden>
+    <svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    <span id="likeLbl">Like</span><span class="cnt" id="likeCount">0</span>
+   </button>
+   <span class="msg" id="likeMsg" aria-live="polite"></span>
+   <!-- здесь потом появится кнопка "Buy me a coffee" -->
+  </div>
+  <div id="ts"></div>
  </div>
 </div>
 <script>
@@ -425,6 +450,104 @@ document.querySelectorAll('label > span > b').forEach(bEl => {
 });
 
 render();
+</script>
+<script>
+(() => {
+ // Site Key из Cloudflare Turnstile. Пока пусто, капча отключена и лайки работают без неё.
+ const TS_SITEKEY = '';
+
+ const btn = document.getElementById('like');
+ if (!btn) return;
+ const cnt = document.getElementById('likeCount'), lbl = document.getElementById('likeLbl'), msg = document.getElementById('likeMsg');
+ const KEY = 'blobgen_liked';
+ let count = 0, shown = 0, liked = false, busy = false, tsId = null, tsDone = null, tsFail = null;
+
+ const store = {
+  get: () => { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } },
+  set: () => { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+ };
+ function show(n) {
+  const from = shown, t0 = performance.now();
+  const step = t => {
+   const k = Math.min(1, (t - t0) / 450);
+   shown = Math.round(from + (n - from) * (1 - Math.pow(1 - k, 3)));
+   cnt.textContent = shown.toLocaleString();
+   if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+ }
+ function setLiked(v) {
+  liked = v;
+  btn.classList.toggle('on', v);
+  btn.setAttribute('aria-pressed', v ? 'true' : 'false');
+  lbl.textContent = v ? 'Thanks!' : 'Like';
+ }
+ function burst() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (let i = 0; i < 9; i++) {
+   const p = document.createElement('span'), a = (i / 9) * 6.283 + Math.random() * .5, d = 26 + Math.random() * 18;
+   p.className = 'pt';
+   p.style.setProperty('--dx', Math.cos(a) * d + 'px');
+   p.style.setProperty('--dy', Math.sin(a) * d + 'px');
+   btn.appendChild(p);
+   setTimeout(() => p.remove(), 750);
+  }
+ }
+ function loadTurnstile() {
+  if (!TS_SITEKEY) return;
+  const s = document.createElement('script');
+  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  s.async = true;
+  document.head.appendChild(s);
+ }
+ function getToken() {
+  if (!TS_SITEKEY || !window.turnstile) return Promise.resolve('');
+  return new Promise((resolve, reject) => {
+   tsDone = resolve;
+   tsFail = () => reject(new Error('captcha'));
+   if (tsId === null) {
+    tsId = turnstile.render('#ts', {
+     sitekey: TS_SITEKEY, execution: 'execute', appearance: 'interaction-only',
+     callback: t => tsDone && tsDone(t), 'error-callback': () => tsFail && tsFail(), 'timeout-callback': () => tsFail && tsFail()
+    });
+   } else turnstile.reset(tsId);
+   turnstile.execute(tsId);
+  });
+ }
+
+ async function load() {
+  try {
+   const r = await fetch('/api/likes', { cache: 'no-store' });
+   if (!r.ok) throw new Error('no backend');
+   const d = await r.json();
+   count = d.count;
+   setLiked(!!d.liked || store.get());
+   if (d.liked) store.set();
+   btn.hidden = false;
+   show(count);
+   loadTurnstile();
+  } catch (e) { /* бэкенда нет (например, файл открыт локально): кнопка просто не показывается */ }
+ }
+
+ btn.addEventListener('click', async () => {
+  if (liked || busy) return;
+  busy = true; msg.textContent = '';
+  burst(); setLiked(true); count++; show(count);
+  try {
+   const token = await getToken();
+   const r = await fetch('/api/likes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+   const d = await r.json().catch(() => ({}));
+   if (!r.ok) throw d;
+   count = d.count; show(count); store.set();
+  } catch (e) {
+   count = Math.max(0, count - 1); show(count); setLiked(false);
+   msg.textContent = e && e.error === 'rate' ? 'Too many likes from your network today.' : e && e.error === 'captcha' ? 'Captcha check failed, please try again.' : 'Something went wrong, please try again.';
+  }
+  busy = false;
+ });
+
+ load();
+})();
 </script>
 </body>
 </html>
