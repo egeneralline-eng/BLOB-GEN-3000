@@ -12,11 +12,17 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:1380px;margin:0 auto;padding:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .stage{flex:1 1 400px;min-width:0}
-canvas{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:10px;border:1px solid var(--line);background:#f4f1ea}
+@media(max-width:959px){
+ .wrap{padding-top:calc(100vw + 8px)}
+ .stage{position:fixed;top:env(safe-area-inset-top,0px);left:12px;right:12px;width:auto;z-index:20;flex:none;background:var(--bg);padding:12px 0 8px}
+ .panel{width:100%}
+}
+canvas{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:10px;border:1px solid var(--line);background:#f4f1ea;touch-action:none;cursor:grab;user-select:none}canvas.dragging{cursor:grabbing}
 .panel{flex:0 0 auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;width:100%;max-width:100%}
 @media(min-width:960px){.panel{width:560px}}
 h1{font-size:17px;margin:0 0 2px}
 label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mut)}
+.mode-control[hidden]{display:none!important}
 label span b{color:var(--fg);font-weight:600;float:right}
 input[type=range]{width:100%;accent-color:var(--acc);margin:2px 0}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -30,6 +36,7 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
 .cols{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:600px){.cols{grid-template-columns:1fr 1fr}}
 .col-sec{display:flex;flex-direction:column;gap:6px}
+.mode-control[hidden]{display:none}
 
 .foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .like{position:relative;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 10px;border-radius:999px;transition:transform .15s,border-color .2s}
@@ -55,25 +62,41 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
   <div class="row">
    <button class="p" id="new">New spot</button>
    <button id="save">PNG</button>
+   <button id="resetView">Reset view</button>
    <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)">Seed <input type="number" id="seed" value="1"></span>
   </div>
   <hr>
   <div class="cols">
    <div class="col-sec">
     <label><span>Rotation <b id="v_yaw"></b>°</span><input type="range" id="yaw" min="0" max="360" value="45"></label>
-    <label><span>Camera angle <b id="v_pitch"></b>°</span><input type="range" id="pitch" min="-60" max="60" value="29"></label>
-    <label><span>Figure tilt <b id="v_lean"></b>°</span><input type="range" id="lean" min="-90" max="90" value="0"></label>
+    <label><span>Camera angle <b id="v_pitch"></b>°</span><input type="range" id="pitch" min="-60" max="60" value="30"></label>
+    <label><span>Figure tilt <b id="v_lean"></b>°</span><input type="range" id="lean" min="0" max="360" value="0"></label>
     <label><span>Perspective <b id="v_persp"></b></span><input type="range" id="persp" min="0" max="100" value="0"></label>
     <hr>
-    <label><span>Pair of Legs <b id="v_legs"></b></span><input type="range" id="legs" min="0" max="4" value="2"></label>
-    <label><span>Pair of hands <b id="v_arms"></b></span><input type="range" id="arms" min="0" max="4" value="2"></label>
-    <label><span>Random offshoots <b id="v_apps"></b></span><input type="range" id="apps" min="0" max="4" value="0"></label>
-    <label><span>Limb lengths <b id="v_len"></b></span><input type="range" id="len" min="10" max="100" value="50"></label>
-    <label><span>Number of limb segments <b id="v_seg"></b></span><input type="range" id="seg" min="1" max="4" value="3"></label>
-    <label class="chk"><input type="checkbox" id="rl" checked> Random limbs in the new blob</label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Pair of Legs <b id="v_legs"></b></span><input type="range" id="legs" min="0" max="4" value="2"></label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Pair of hands <b id="v_arms"></b></span><input type="range" id="arms" min="0" max="4" value="2"></label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Random offshoots <b id="v_apps"></b></span><input type="range" id="apps" min="0" max="4" value="0"></label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Limb lengths <b id="v_len"></b></span><input type="range" id="len" min="10" max="100" value="50"></label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Number of limb segments <b id="v_seg"></b></span><input type="range" id="seg" min="1" max="4" value="3"></label>
+    <label class="chk mode-control" data-modes="bilateral radial spherical asymmetry metameric"><input type="checkbox" id="rl" checked> Random limbs in the new blob</label>
    </div>
    <div class="col-sec">
-    <label><span>Symmetry <b id="v_sym"></b></span><input type="range" id="sym" min="0" max="100" value="100"></label>
+    <label><span>Symmetry type</span>
+     <select id="symType">
+      <option value="bilateral">Bilateral</option>
+      <option value="radial">Radial</option>
+      <option value="spherical">Spherical</option>
+      <option value="asymmetry">Asymmetry</option>
+      <option value="metameric">Metameric</option>
+     </select>
+    </label>
+    <label class="mode-control" data-modes="bilateral radial spherical asymmetry metameric"><span>Symmetry <b id="v_sym"></b></span><input type="range" id="sym" min="0" max="100" value="100"></label>
+    <label class="mode-control" data-modes="radial"><span>Number of rays <b id="v_rays"></b></span><input type="range" id="rays" min="3" max="8" value="5"></label>
+    <label class="mode-control" data-modes="spherical"><span>Platonic solid <b id="v_sphFaces"></b></span><input type="range" id="sphFaces" min="0" max="4" step="1" value="4"></label>
+    <label class="mode-control" data-modes="spherical"><span>Spike variation <b id="v_spikeVar"></b></span><input type="range" id="spikeVar" min="0" max="100" value="50"></label>
+    <label class="mode-control" data-modes="metameric"><span>Body segments <b id="v_meta"></b></span><input type="range" id="meta" min="3" max="12" value="6"></label>
+    <label class="mode-control" data-modes="metameric"><span>Tail taper <b id="v_metaTaper"></b></span><input type="range" id="metaTaper" min="0" max="100" value="65"></label>
+    <label class="mode-control" data-modes="metameric"><span>Body curvature <b id="v_metaCurve"></b></span><input type="range" id="metaCurve" min="-100" max="100" value="0"></label>
     <label><span>Chaos ↔ Being <b id="v_cre"></b></span><input type="range" id="cre" min="0" max="100" value="75"></label>
     <label><span>Face Curvature <b id="v_curve"></b></span><input type="range" id="curve" min="0" max="100" value="0"></label>
     <hr>
@@ -107,7 +130,8 @@ hr{border:0;border-top:1px solid var(--line);width:100%;margin:2px 0}
 </div>
 <script>
 const $=id=>document.getElementById(id), cv=$('cv'), ctx=cv.getContext('2d');
-const ids=['n','size','spread','poly','irr','curve','cre','sym','yaw','pitch','lean','persp','legs','arms','apps','len','seg','light','air','op'];
+let cachedBodies=null,cachedKey='',viewZoom=1,viewPanX=0,viewPanY=0,ringAlpha=0,ringMode='both',ringTimer=null,ringFadeFrame=null,ringAnimStart=0,ringAnimFrom=0,ringAnimTo=0,ringAnimDuration=0;
+const ids=['n','size','spread','poly','irr','curve','cre','sym','yaw','pitch','lean','persp','legs','arms','apps','len','seg','light','air','op','rays','spikeVar','sphFaces','meta','metaTaper','metaCurve'];
 function mk(s){let a=s>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const REG=[{x:-.05,y:-.62,z:.1,rx:.2,ry:.18,rz:.18,w:2,s:.8},{x:-.12,y:-.1,z:0,rx:.3,ry:.35,rz:.25,w:5,s:1.3},{x:-.12,y:.3,z:0,rx:.25,ry:.15,rz:.22,w:2,s:1}];
 const TW=REG.reduce((a,r)=>a+r.w,0);
@@ -145,7 +169,7 @@ function frame(w,tw){
  const a=[u[0]*c+v[0]*s,u[1]*c+v[1]*s,u[2]*c+v[2]*s],b=[-u[0]*s+v[0]*c,-u[1]*s+v[1]*c,-u[2]*s+v[2]*c];
  return[[a[0],b[0],w[0]],[a[1],b[1],w[1]],[a[2],b[2],w[2]]];
 }
-function generate(P,seed,att){
+function generateUnit(P,seed,att){
  const rnd=mk(seed*7919+att*104729+1);
  const g=()=>Math.sqrt(-2*Math.log(1-rnd()))*Math.cos(6.2832*rnd());
  function build(c,R,hx,hy,h,tpF,tone,ue,rk,cs,forceTp){
@@ -213,31 +237,284 @@ function generate(P,seed,att){
   }
   return segs;
  }
- const a=1-P.sym,L=Math.ceil(P.n/2),left=[];
- for(let i=0;i<L;i++)left.push(fresh());
- const big=[...left].sort((u,v)=>v.rin-u.rin)[0];
- big.c[0]=Math.max(big.c[0],-big.rin*.8);
- connect(left);
- const out=[];
- for(const s of left){
-  out.push(s);
-  const ur=rnd(),f2=fresh(),sc=Math.exp(g()*a*.5),Rj=rotm(g()*a*.4,g()*a*.6,g()*a*1.2),jx=g(),jy=g(),jz=g();
-  let m;
-  if(ur<a*.5){m=f2;m.c[0]=Math.abs(m.c[0])}
-  else m={c:[-s.c[0]+jx*a*.25,s.c[1]+jy*a*.2,s.c[2]+jz*a*.1],rin:s.rin*sc,tone:s.tone,n:s.n,
-   V:s.V.map(v=>mul(Rj,[-v[0]*sc,v[1]*sc,v[2]*sc]))};
-  out.push(m);
- }
- connect(out);
- const core=out.slice(),kinds=[P.legs,P.arms,P.apps];
- for(let kd=0;kd<3;kd++)for(let i=0;i<kinds[kd];i++){
-  const sp={kind:kd,i,n:kinds[kd]};
-  out.push(...chain(core,sp,1,0),...chain(core,sp,-1,a));
+ const a=1-P.sym;
+ let out=[];
+ if(P.symType==='asymmetry'){
+  for(let i=0;i<P.n;i++)out.push(fresh());
+  connect(out);
+  const core=out.slice(),kinds=[P.legs,P.arms,P.apps];
+  for(let kd=0;kd<3;kd++)for(let i=0;i<kinds[kd];i++){
+   const sp={kind:kd,i,n:kinds[kd]},side=rnd()<.5?1:-1;
+   out.push(...chain(core,sp,side,a));
+  }
+ }else{
+  const L=Math.ceil(P.n/2),left=[];
+  for(let i=0;i<L;i++)left.push(fresh());
+  const big=[...left].sort((u,v)=>v.rin-u.rin)[0];
+  big.c[0]=Math.max(big.c[0],-big.rin*.8);
+  connect(left);
+  for(const body of left){
+   out.push(body);
+   const ur=rnd(),f2=fresh(),sc=Math.exp(g()*a*.5),Rj=rotm(g()*a*.4,g()*a*.6,g()*a*1.2),jx=g(),jy=g(),jz=g();
+   let m;
+   if(ur<a*.5){m=f2;m.c[0]=Math.abs(m.c[0])}
+   else m={c:[-body.c[0]+jx*a*.25,body.c[1]+jy*a*.2,body.c[2]+jz*a*.1],rin:body.rin*sc,tone:body.tone,n:body.n,
+    V:body.V.map(v=>mul(Rj,[-v[0]*sc,v[1]*sc,v[2]*sc]))};
+   out.push(m);
+  }
+  connect(out);
+  const core=out.slice(),kinds=[P.legs,P.arms,P.apps];
+  for(let kd=0;kd<3;kd++)for(let i=0;i<kinds[kd];i++){
+   const sp={kind:kd,i,n:kinds[kd]};
+   out.push(...chain(core,sp,1,0),...chain(core,sp,-1,a));
+  }
  }
  const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
  for(const s of out)for(const v of s.V)for(let i=0;i<3;i++){const q=s.c[i]+v[i];lo[i]=Math.min(lo[i],q);hi[i]=Math.max(hi[i],q)}
  const ct=lo.map((l,i)=>(l+hi[i])/2);
  for(const s of out){s.c=s.c.map((q,i)=>q-ct[i]);s.F=makeFaces(s)}
+ return out;
+}
+
+
+function norm3(v){const l=Math.hypot(v[0],v[1],v[2])||1;return v.map(x=>x/l);}
+function frameY(w){
+ w=norm3(w);
+ const ref=Math.abs(w[2])<.9?[0,0,1]:[1,0,0];
+ let x=[ref[1]*w[2]-ref[2]*w[1],ref[2]*w[0]-ref[0]*w[2],ref[0]*w[1]-ref[1]*w[0]];
+ x=norm3(x);
+ const z=[x[1]*w[2]-x[2]*w[1],x[2]*w[0]-x[0]*w[2],x[0]*w[1]-x[1]*w[0]];
+ return[[x[0],w[0],z[0]],[x[1],w[1],z[1]],[x[2],w[2],z[2]]];
+}
+function platonicSolid(index){
+ const phi=(1+Math.sqrt(5))/2,iv=1/phi;
+ let V=[];
+ if(index===0){ // tetrahedron
+  V=[[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]];
+ }else if(index===1){ // cube
+  for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])V.push([x,y,z]);
+ }else if(index===2){ // octahedron
+  V=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+ }else if(index===3){ // dodecahedron
+  for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])V.push([x,y,z]);
+  for(const a of [-1,1])for(const b of [-1,1]){
+   V.push([0,a*iv,b*phi],[a*iv,b*phi,0],[a*phi,0,b*iv]);
+  }
+ }else{ // icosahedron
+  for(const a of [-1,1])for(const b of [-1,1]){
+   V.push([0,a,b*phi],[a,b*phi,0],[a*phi,0,b]);
+  }
+ }
+ const norm=v=>{const l=Math.hypot(...v)||1;return v.map(x=>x/l)};
+ const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+ const faces=new Map(),eps=1e-5;
+ for(let i=0;i<V.length;i++)for(let j=i+1;j<V.length;j++)for(let k=j+1;k<V.length;k++){
+  let n=norm(cross(V[j].map((x,q)=>x-V[i][q]),V[k].map((x,q)=>x-V[i][q])));
+  let d=dot(n,V[i]),ds=V.map(v=>dot(n,v)-d);
+  const pos=ds.some(x=>x>eps),neg=ds.some(x=>x< -eps);
+  if(pos&&neg)continue;
+  if(dot(n,V.reduce((a,v)=>a.map((x,q)=>x+v[q]),[0,0,0]))<0){n=n.map(x=>-x);d=-d;ds=ds.map(x=>-x)}
+  const ids=ds.map((x,q)=>Math.abs(x)<eps?q:-1).filter(x=>x>=0);
+  if(ids.length<3)continue;
+  const key=ids.slice().sort((a,b)=>a-b).join(',');
+  if(faces.has(key))continue;
+  const c=ids.reduce((a,q)=>a.map((x,t)=>x+V[q][t]/ids.length),[0,0,0]);
+  const ref=Math.abs(n[1])<.9?[0,1,0]:[1,0,0];
+  const u=norm(cross(ref,n)),v=cross(n,u);
+  ids.sort((a,b)=>{
+   const A=V[a].map((x,q)=>x-c[q]),B=V[b].map((x,q)=>x-c[q]);
+   return Math.atan2(dot(A,v),dot(A,u))-Math.atan2(dot(B,v),dot(B,u));
+  });
+  faces.set(key,{indices:ids,center:c,normal:n,u,v,sides:ids.length});
+ }
+ return{vertices:V,faces:[...faces.values()]};
+}
+const _groupCache={};
+function matMul3(A,B){const R=[[0,0,0],[0,0,0],[0,0,0]];for(let i=0;i<3;i++)for(let j=0;j<3;j++)R[i][j]=A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j];return R;}
+// All proper rotations that map the solid's vertex set onto itself (12 / 24 / 60 elements).
+function rotationGroup(si,SV){
+ if(_groupCache[si])return _groupCache[si];
+ const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+ const basis=(p0,p1,p2)=>{const e1=norm3(sub(p1,p0)),e3=norm3(cr(e1,sub(p2,p0))),e2=cr(e3,e1);return[e1,e2,e3]};
+ let i2=2;while(i2<SV.length&&Math.hypot(...cr(sub(SV[1],SV[0]),sub(SV[i2],SV[0])))<1e-6)i2++;
+ const v0=SV[0],v1=SV[1],v2=SV[i2],Bv=basis(v0,v1,v2),d01=dist(v0,v1),d02=dist(v0,v2),d12=dist(v1,v2),eps=1e-4;
+ const isVert=p=>SV.some(q=>dist(p,q)<eps),seen=new Map(),out=[];
+ for(let a=0;a<SV.length;a++)for(let b=0;b<SV.length;b++){
+  if(a===b||Math.abs(dist(SV[a],SV[b])-d01)>eps)continue;
+  for(let c=0;c<SV.length;c++){
+   if(c===a||c===b||Math.abs(dist(SV[a],SV[c])-d02)>eps||Math.abs(dist(SV[b],SV[c])-d12)>eps)continue;
+   const Bw=basis(SV[a],SV[b],SV[c]),R=[[0,0,0],[0,0,0],[0,0,0]];
+   for(let i=0;i<3;i++)for(let j=0;j<3;j++)for(let k=0;k<3;k++)R[i][j]+=Bw[k][i]*Bv[k][j];
+   if(!SV.every(v=>isVert(mul(R,v))))continue;
+   const key=R.flat().map(x=>Math.round(x*1000)).join(',');
+   if(!seen.has(key)){seen.set(key,1);out.push(R)}
+  }
+ }
+ return _groupCache[si]=out;
+}
+// Regular n-gon prism (rectangle for n=2) whose local Z axis is aligned by R; invariant under the n-fold axis rotation.
+function prismBody(c,R,n,rad,h,tp,tone,asp){
+ asp=asp||1;
+ const base=[];
+ if(n===2)base.push([rad,rad*.5],[-rad,rad*.5],[-rad,-rad*.5],[rad,-rad*.5]);
+ else for(let k=0;k<n;k++){const a=k*Math.PI*2/n+Math.PI/n;base.push([Math.cos(a)*rad,Math.sin(a)*rad])}
+ for(const q of base)q[1]*=asp;
+ const m=base.length,loc=base.map(q=>[q[0],q[1],-h]).concat(base.map(q=>[q[0]*tp,q[1]*tp,h]));
+ const b={c,V:loc.map(v=>mul(R,v)),rin:Math.min(h,rad*(n===2?.5:Math.cos(Math.PI/n))*Math.min(1,asp))*.9*(1+Math.min(1,tp))/2,tone,n:m};
+ b.F=makeFaces(b);return b;
+}
+// One random block (box with optional chamfers), centred at the origin.
+function makeBlock(P,rnd,g){
+ const ue=rnd(),utp=rnd(),gs=g(),gel=g(),uh=rnd(),tone=rnd();
+ const rk=[rnd(),rnd(),rnd(),rnd()],cs=[rnd(),rnd(),rnd(),rnd()],ra=[],gr=[];
+ for(let i=0;i<3;i++){ra.push([rnd(),rnd()]);gr.push(g())}
+ const r=Math.max(.02,Math.min(.45,P.size*Math.exp(P.spread*1.2*gs)));
+ const el=Math.exp(gel*P.irr*.5),hx=.707*r,hy=.707*r*el,h=r*(.35+uh*.9),tpF=Math.max(.5,1-utp*.4*(P.irr+.3));
+ const e=Math.min(4,Math.floor(P.poly*ue*4.99)),tp=1-(1-tpF)*(e>0?P.poly:0);
+ const K=[[hx,hy],[-hx,hy],[-hx,-hy],[hx,-hy]],base=[];
+ for(let k=0;k<4;k++){
+  const rank=rk.filter(v=>v<rk[k]).length,q=K[k];
+  if(rank<e){const f=.12+cs[k]*.16,pk=K[(k+3)%4],nk=K[(k+1)%4];
+   base.push([q[0]+(pk[0]-q[0])*f,q[1]+(pk[1]-q[1])*f],[q[0]+(nk[0]-q[0])*f,q[1]+(nk[1]-q[1])*f])}
+  else base.push(q)}
+ const tl=P.irr*.35+.05,kk=u=>u[0]<.5?0:Math.floor(u[1]*4);
+ const R=rotm(kk(ra[0])*Math.PI/2+gr[0]*tl,kk(ra[1])*Math.PI/2+gr[1]*tl,kk(ra[2])*Math.PI/2+gr[2]*tl);
+ const loc=base.map(q=>[q[0],q[1],-h]).concat(base.map(q=>[q[0]*tp,q[1]*tp,h]));
+ const b={c:[0,0,0],V:loc.map(v=>mul(R,v)),rin:Math.min(h,Math.min(hx,hy))*.9*(1+tpF)/2,tone,n:base.length};
+ b.F=makeFaces(b);return b;
+}
+function generate(P,seed,att){
+
+ const mode=P.symType||'bilateral';
+ if(mode==='bilateral'||mode==='asymmetry')return generateUnit(P,seed,att);
+ const rng=mk(seed*32452843+att*49979687+97),rand=()=>rng();
+ const transform=(body,M,offset,scale,center=[0,0,0],stretchY=1)=>{
+  const apply=v=>{
+   const q=[v[0],v[1]*stretchY,v[2]];
+   return[
+    M[0][0]*q[0]+M[0][1]*q[1]+M[0][2]*q[2],
+    M[1][0]*q[0]+M[1][1]*q[1]+M[1][2]*q[2],
+    M[2][0]*q[0]+M[2][1]*q[1]+M[2][2]*q[2]
+   ];
+  };
+  const c0=body.c.map((v,i)=>v-center[i]);
+  const c=apply(c0).map((v,i)=>v*scale+offset[i]);
+  const V=body.V.map(v=>apply(v).map(x=>x*scale));
+  const b={c,V,rin:(body.rin||.1)*scale,tone:body.tone||rand(),n:body.n||V.length};
+  if(stretchY!==1)b.F=makeFaces(b);
+  else b.F=body.F?body.F.map(f=>({idx:f.idx.slice(),n:norm3([
+   M[0][0]*f.n[0]+M[0][1]*f.n[1]+M[0][2]*f.n[2],
+   M[1][0]*f.n[0]+M[1][1]*f.n[1]+M[1][2]*f.n[2],
+   M[2][0]*f.n[0]+M[2][1]*f.n[1]+M[2][2]*f.n[2]
+  ])})):makeFaces(b);
+  return b;
+ };
+ const bounds=arr=>{
+  const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];
+  for(const b of arr)for(const v of b.V)for(let k=0;k<3;k++){const q=b.c[k]+v[k];lo[k]=Math.min(lo[k],q);hi[k]=Math.max(hi[k],q);}
+  return{lo,hi,center:lo.map((v,i)=>(v+hi[i])/2),height:hi[1]-lo[1],radius:Math.max(.01,...hi.map((v,i)=>Math.abs(v-lo[i])/2))};
+ };
+ const out=[];
+ if(mode==='spherical'){
+  // Real polyhedral symmetry: one fundamental piece is repeated by every rotation of the chosen Platonic solid.
+  const si=Math.max(0,Math.min(4,Math.round(P.sphFaces||0)));
+  const solid=platonicSolid(si),SV=solid.vertices.map(norm3),G=rotationGroup(si,SV);
+  const names=['Tetrahedron','Cube','Octahedron','Dodecahedron','Icosahedron'];
+  const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  const f0=solid.faces[0],coreR=.18+P.size*1.4;
+  let inr=1;for(const f of solid.faces)inr=Math.min(inr,dot3(f.normal,SV[f.indices[0]]));
+  const coreIn=coreR*inr,noise=1-P.sym;
+  const jit=g=>{
+   if(noise<=.001)return{M:g,off:[0,0,0],sc:1};
+   return{M:matMul3(rotm((rand()-.5)*noise*.5,(rand()-.5)*noise*.5,(rand()-.5)*noise*.5),g),
+    off:[(rand()-.5)*noise*.08,(rand()-.5)*noise*.08,(rand()-.5)*noise*.08],sc:1+(rand()-.5)*noise*.3};
+  };
+  // 1. symmetric core: the Platonic solid itself
+  out.push({c:[0,0,0],V:SV.map(v=>v.map(x=>x*coreR)),F:solid.faces.map(f=>({idx:f.indices.slice(),n:f.normal.slice()})),rin:coreIn*.9,tone:rand(),n:SV.length});
+  // 2. fundamental piece: a small chain of blocks inside one fundamental domain, repeated by the whole group
+  const last=f0.indices.length-1;
+  const mid1=norm3(SV[f0.indices[0]].map((v,q)=>v+SV[f0.indices[1]][q]));
+  const mid2=norm3(SV[f0.indices[0]].map((v,q)=>v+SV[f0.indices[last]][q]));
+  const fn=norm3(f0.normal),va=SV[f0.indices[0]];
+  const domainDir=()=>{const e=rand()<.5?mid1:mid2,w=[rand()+.05,rand()+.05,rand()+.05];return norm3(va.map((v,q)=>v*w[0]+e[q]*w[1]+fn[q]*w[2]))};
+  const gauss=()=>Math.sqrt(-2*Math.log(1-rand()))*Math.cos(6.2832*rand());
+  const k=Math.max(1,Math.round(P.n/G.length)),piece=[];
+  for(let j=0;j<k;j++){
+   const b=makeBlock(P,rand,gauss);
+   if(j===0){const d=domainDir(),dr=coreIn*(.8+.3*rand());b.c=d.map(x=>x*dr)}
+   else{
+    const prev=piece[piece.length-1],rad=norm3(prev.c);
+    let u=norm3([gauss(),gauss(),gauss()]);if(dot3(u,rad)<0)u=u.map(x=>-x);
+    const dd=(prev.rin+b.rin)*.85;b.c=prev.c.map((x,q)=>x+u[q]*dd);
+   }
+   piece.push(b);
+  }
+  for(const b of piece)for(const g of G){const j=jit(g);out.push(transform(b,j.M,j.off,j.sc,[0,0,0]))}
+  // 3. spikes along symmetry axes: vertices / face centres / edge midpoints (sliders Legs / Hands / Offshoots)
+  const reps=[SV[0],fn,mid1],lenF=[0,.5,.75,1,1.3],strengths=[P.legs,P.arms,P.apps];
+  const orderOf=d=>{const set=new Set();for(const g of G)set.add(mul(g,d).map(x=>Math.round(x*1000)).join(','));return Math.round(G.length/set.size)};
+  for(let ci=0;ci<3;ci++){
+   const v=Math.min(4,Math.round(strengths[ci]||0));if(v<=0)continue;
+   const d=reps[ci],n=Math.max(2,orderOf(d)),Ls=(.25+.9*P.len)*lenF[v],ns=Math.max(1,Math.round(P.seg)),vr=P.spikeVar||0,seen=new Set();
+   let dir=d.slice(),pos=d.map(x=>x*coreIn*.6);
+   for(let j=0;j<ns;j++){
+    // Per-segment variation comes from its own generator, so it never disturbs the rest of the figure.
+    const sv=mk(seed*1013+si*1777+ci*131+j*7919+att*31+5),r1=sv(),r2=sv(),r3=sv(),r4=sv(),r5=sv(),r6=sv();
+    if(j>0&&vr>0){
+     // bend the chain: direction tilts away from the previous one by up to ~40 degrees
+     const ang=r1*vr*.7,az=r2*6.2832,Fm=frame(dir,0),uu=[Fm[0][0],Fm[1][0],Fm[2][0]],vv=[Fm[0][1],Fm[1][1],Fm[2][1]];
+     const tg=uu.map((x,q)=>x*Math.cos(az)+vv[q]*Math.sin(az));
+     dir=norm3(dir.map((x,q)=>x*Math.cos(ang)+tg[q]*Math.sin(ang)));
+    }
+    const k1=j>0?Math.exp((r3-.5)*vr*1.0):1,k2=j>0?Math.exp((r4-.5)*vr*1.2):1,asp=j>0?Math.exp((r5-.5)*vr*1.4):1;
+    const l=Ls/ns*(1-.08*j)*k1,rad=Math.max(.02,P.size*(.62-.09*j)*k2),tp=Math.max(.3,Math.min(1.15,.7+(r6-.5)*vr*.9));
+    const body=prismBody(pos.map((x,q)=>x+dir[q]*l/2),frame(dir,0),n,rad,l/2,tp,rand(),asp);
+    for(const g of G){
+     // identical copies (a regular section on its own axis) are skipped; distinct ones (bent or flattened segments) are all kept
+     const key=body.V.map(w=>mul(g,[body.c[0]+w[0],body.c[1]+w[1],body.c[2]+w[2]]).map(x=>Math.round(x*400)).join(',')).sort().join('|');
+     if(seen.has(key))continue;seen.add(key);
+     const jj=jit(g);out.push(transform(body,jj.M,jj.off,jj.sc,[0,0,0]));
+    }
+    pos=pos.map((x,q)=>x+dir[q]*l*.85);
+   }
+  }
+  P._solidName=names[si]+' · '+G.length+' rotations · '+k+' block'+(k>1?'s':'')+' per unit';
+ 
+}else if(mode==='radial'){
+  const copies=Math.max(3,Math.min(8,P.rays||5));
+  const localP={...P,n:Math.max(1,Math.round(P.n/copies))};
+  const unit=generateUnit(localP,seed,att),B=bounds(unit);
+  for(let i=0;i<copies;i++){
+   const noise=(1-P.sym)*.18,angle=i*Math.PI*2/copies+(rand()-.5)*noise;
+   const M=rotm(0,angle,0),scale=1+(rand()-.5)*noise*.25;
+   const off=[(rand()-.5)*noise*.1,0,(rand()-.5)*noise*.1];
+   for(const b of unit)out.push(transform(b,M,off,scale,B.center));
+  }
+ }else if(mode==='metameric'){
+  const copies=Math.max(3,Math.min(12,P.meta||6));
+  const localP={...P,n:Math.max(1,Math.ceil(P.n/copies))};
+  const unit=generateUnit(localP,seed,att),B=bounds(unit);
+  const taper=(P.metaTaper||0)/100,curve=(P.metaCurve||0)/100;
+  const baseSpacing=Math.max(.13,B.height*.47);
+  const scales=Array.from({length:copies},(_,i)=>Math.max(.28,1-.68*taper*(i/(copies-1))));
+  const distances=[0];
+  for(let i=1;i<copies;i++)distances.push(distances[i-1]+baseSpacing*(scales[i-1]+scales[i])*.5);
+  const totalLength=distances[copies-1]||baseSpacing;
+  const curveSafe=curve*.86,maxAngle=curveSafe*Math.PI*.82,arcR=Math.abs(maxAngle)>.01?totalLength/maxAngle:0;
+  for(let i=0;i<copies;i++){
+   const t=distances[i]/totalLength,angle=(t-.5)*maxAngle;
+   const y=Math.abs(maxAngle)>.01?arcR*Math.sin(angle):distances[i]-totalLength/2;
+   const z=Math.abs(maxAngle)>.01?arcR*(Math.cos(angle)-Math.cos(maxAngle/2)):0;
+   const tangent=Math.abs(maxAngle)>.01?[0,Math.cos(angle),-Math.sin(angle)]:[0,1,0];
+   const M=frameY(tangent),off=[0,y,z],noise=(1-P.sym)*.045;
+   off[0]+=(rand()-.5)*noise;off[2]+=(rand()-.5)*noise;
+   for(const b of unit)out.push(transform(b,M,off,scales[i],B.center));
+  }
+  }
+ if(!out.length)return generateUnit(P,seed,att);
+ const B=bounds(out),center=B.center;
+ for(const b of out){b.c=b.c.map((v,i)=>v-center[i]);if(!b.F)b.F=makeFaces(b);}
  return out;
 }
 
@@ -277,9 +554,9 @@ function project(bodies,P,lite){
  let dmin=1e9,dmax=-1e9;
  if(lite){for(const s of polys)for(const q of s.pts)m=Math.max(m,Math.abs(q[0]),Math.abs(q[1]))}
  else for(const t of tris)for(let i=0;i<9;i+=3){m=Math.max(m,Math.abs(t[i]),Math.abs(t[i+1]));dmin=Math.min(dmin,t[i+2]);dmax=Math.max(dmax,t[i+2])}
- const k2=Math.min(1,1/m);
- for(const s of polys)s.pts=s.pts.map(q=>[q[0]*k2,q[1]*k2]);
- for(const t of tris){t[0]*=k2;t[1]*=k2;t[3]*=k2;t[4]*=k2;t[6]*=k2;t[7]*=k2}
+ const k2=P.fixedScale||Math.min(1,1/m),z=P.zoom||1,px=P.panX||0,py=P.panY||0;
+ for(const s of polys)s.pts=s.pts.map(q=>[q[0]*k2*z+px,q[1]*k2*z+py]);
+ for(const t of tris){for(const i of [0,3,6]){t[i]=t[i]*k2*z+px;t[i+1]=t[i+1]*k2*z+py}}
  return{polys,tris,dmin,dmax};
 }
 
@@ -333,11 +610,16 @@ function zrender(res,P){
    const t=(zb[i]-res.dmin)/dr,h=Math.min(1,Math.max(0,P.air*(1-t)*.75));
    r+=(244-r)*h;g+=(241-g)*h;b+=(234-b)*h;
    r+=(244-r)*op;g+=(241-g)*op;b+=(241-b)*op}
-  D[j]=r;D[j+1]=g;D[j+2]=b;D[j+3]=255}
+  D[j]=r;D[j+1]=g;D[j+2]=b;D[j+3]=zb[i]>-1e8?255:0}
  bctx.putImageData(img,0,0);
 }
 function draw(c,res,W,P,fill){
  if(fill){c.clearRect(0,0,W,W);c.fillStyle='#000';for(const s of res.polys){path(c,s.pts,W/2,0);c.fill()}return}
+ c.clearRect(0,0,W,W);
+ c.fillStyle='#f4f1ea';c.fillRect(0,0,W,W);
+ // Guides are drawn first; transparent pixels in the model render let them
+ // remain visible around the figure while the figure itself covers the lines.
+ if(ringAlpha>0)drawGuides(c,W,P);
  zrender(res,P);
  c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
  c.drawImage(big,0,0,W,W);
@@ -363,22 +645,151 @@ function good(polys,P){
 
 function params(){
  const v={};ids.forEach(k=>v[k]=+$(k).value);
- return{n:v.n,size:v.size/100,spread:v.spread/100,poly:v.poly/100,irr:v.irr/100,cre:v.cre/100,sym:v.sym/100,op:v.op/100,curve:v.curve/100,yaw:v.yaw,pitch:v.pitch,lean:v.lean,persp:v.persp/100,legs:v.legs,arms:v.arms,apps:v.apps,len:v.len/100,seg:v.seg,light:v.light/100,air:v.air/100,pal:$('pal').value};
+ return{n:v.n,size:v.size/100,spread:v.spread/100,poly:v.poly/100,irr:v.irr/100,cre:v.cre/100,sym:v.sym/100,op:v.op/100,curve:v.curve/100,yaw:v.yaw,pitch:v.pitch,lean:v.lean,persp:v.persp/100,legs:v.legs,arms:v.arms,apps:v.apps,len:v.len/100,seg:v.seg,light:v.light/100,air:v.air/100,pal:$('pal').value,symType:$('symType').value,rays:v.rays,sphFaces:v.sphFaces,meta:v.meta,metaTaper:v.metaTaper,metaCurve:v.metaCurve,spikeVar:v.spikeVar/100};
+}
+function geometryKey(P,seed){
+ const keys=['n','size','spread','poly','irr','cre','sym','legs','arms','apps','len','seg','symType','rays','spikeVar','sphFaces','meta','metaTaper','metaCurve'];
+ return JSON.stringify([seed,$('flt').checked,...keys.map(k=>P[k])]);
 }
 function render(){
  ids.forEach(k=>$('v_'+k)&&($('v_'+k).textContent=$(k).value));
- const P=params(),seed=+$('seed').value||1,ref={...P,yaw:45,pitch:29,lean:0,persp:0,curve:0,poly:0};
- let att=0,ok=true;
- if($('flt').checked){
-  ok=false;
-  for(att=0;att<80;att++){if(good(project(generate(ref,seed,att),ref,true),ref)){ok=true;break}}
-  if(!ok)att=0;
+ if($('v_sphFaces'))$('v_sphFaces').textContent=['Tetrahedron · 4','Cube · 6','Octahedron · 8','Dodecahedron · 12','Icosahedron · 20'][+$('sphFaces').value]||'Icosahedron · 20';
+ const P=params(),seed=+$('seed').value||1,key=geometryKey(P,seed);
+ if(key!==cachedKey||!cachedBodies){
+  let att=0,ok=true;
+  const ref={...P,yaw:45,pitch:30,lean:0,persp:0,curve:0,poly:0};
+  if($('flt').checked){
+   ok=false;
+   const maxAttempts=(P.symType==='bilateral'||P.symType==='asymmetry')?80:24;
+   for(att=0;att<maxAttempts;att++){if(good(project(generate(ref,seed,att),ref,true),ref)){ok=true;break}}
+   if(!ok)att=0;
+  }
+  cachedBodies=generate(P,seed,att);cachedKey=key;
+  let radius=.001,minY=1e9,maxY=-1e9;
+  for(const b of cachedBodies)for(const v of b.V){radius=Math.max(radius,Math.hypot(b.c[0]+v[0],b.c[1]+v[1],b.c[2]+v[2]));const yy=b.c[1]+v[1];minY=Math.min(minY,yy);maxY=Math.max(maxY,yy)}
+  cachedBodies._viewScale=.82/radius;
+  // A fixed world-horizontal guide sits just below the model's lower extent.
+  cachedBodies._floorY=maxY-.10*(maxY-minY);
+  $('info').textContent=$('flt').checked?(ok?`Matched variation #${att+1}`:'No match found, showing first variant'):'';
+  if(P.symType==='spherical')$('info').textContent+=' · '+(P._solidName||'Platonic solid');
  }
- const bodies=generate(P,seed,att);
- draw(ctx,project(bodies,P),900,P,false);
- $('info').textContent=$('flt').checked?(ok?`Matched variation #${att+1}`:'No match found, showing first variant'):'';
+ P.fixedScale=cachedBodies._viewScale;P.zoom=viewZoom;P.panX=viewPanX;P.panY=viewPanY;
+ draw(ctx,project(cachedBodies,P),900,P,false);
 }
+
+function drawGuides(c,W,P){
+ const th=P.yaw*Math.PI/180,co=Math.cos(th),si=Math.sin(th),ph=P.pitch*Math.PI/180,cp=Math.cos(ph),sp=Math.sin(ph),la=P.lean*Math.PI/180,cl=Math.cos(la),sl=Math.sin(la),pers=P.persp*.7;
+ const scale=(P.fixedScale||1)*(P.zoom||1),px=P.panX||0,py=P.panY||0;
+ // The guides have a small, fixed screen-space diameter, independent of model size and zoom.
+ const radius=.24/Math.max(.001,scale);
+ const floorY=cachedBodies&&Number.isFinite(cachedBodies._floorY)?cachedBodies._floorY:.58;
+ const projectPoint=(x,y,z,followTilt)=>{
+  let yy=y,zz=z;
+  if(followTilt){yy=y*cl+z*sl;zz=-y*sl+z*cl;}
+  const z1=-x*si+zz*co,X=x*co+zz*si,Y=yy*cp+z1*sp,Z=-yy*sp+z1*cp,f=1/Math.max(.35,1-pers*Z);
+  return[W/2+(X*f*scale+px)*W*.95,W/2+(Y*f*scale+py)*W*.95];
+ };
+ const drawCircle=(kind)=>{
+  c.beginPath();
+  for(let i=0;i<=160;i++){
+   const a=i/160*Math.PI*2;
+   // Rotation guide: world-horizontal XZ plane, never affected by figure tilt.
+   // Tilt guide: vertical YZ plane, rotated together with the figure.
+   const q=kind==='floor'
+    ?projectPoint(Math.cos(a)*radius,floorY,Math.sin(a)*radius,false)
+    :projectPoint(0,Math.cos(a)*radius,Math.sin(a)*radius,true);
+   if(i===0)c.moveTo(q[0],q[1]);else c.lineTo(q[0],q[1]);
+  }
+  c.stroke();
+ };
+ const old=c.globalAlpha;c.globalAlpha=ringAlpha;c.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#6aa9ee';c.lineWidth=W/cv.getBoundingClientRect().width;c.setLineDash([]);
+ // Keep both guides visible together to avoid a hard switch / blink when drag direction changes.
+ drawCircle('floor');drawCircle('tilt');
+ c.globalAlpha=old;
+}
+function animateGuidesTo(target,duration){
+ if(ringFadeFrame)cancelAnimationFrame(ringFadeFrame);
+ ringAnimFrom=ringAlpha;ringAnimTo=target;ringAnimStart=performance.now();ringAnimDuration=duration;
+ const step=t=>{
+  const k=Math.min(1,(t-ringAnimStart)/ringAnimDuration),ease=k*k*(3-2*k);
+  ringAlpha=ringAnimFrom+(ringAnimTo-ringAnimFrom)*ease;
+  render();
+  if(k<1)ringFadeFrame=requestAnimationFrame(step);else ringFadeFrame=null;
+ };
+ ringFadeFrame=requestAnimationFrame(step);
+}
+function showGuides(){
+ ringMode='both';
+ if(ringTimer)clearTimeout(ringTimer);
+ if(ringAnimTo!==1)animateGuidesTo(1,160);
+ ringTimer=setTimeout(()=>animateGuidesTo(0,650),500);
+}
+
+function setRange(id,value){const el=$(id),min=+el.min,max=+el.max;el.value=Math.max(min,Math.min(max,value));const label=$('v_'+id);if(label)label.textContent=el.value;}
+function zoomBy(factor){viewZoom=Math.max(.3,Math.min(5,viewZoom*factor));render();showGuides();}
+// Drag directly on the canvas: horizontal = endless rotation, vertical = figure tilt.
+const pointers=new Map();let dragState=null,pinchState=null;
+cv.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='mouse'&&e.button!==0)return;
+ e.preventDefault();cv.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1){dragState={id:e.pointerId,x:e.clientX,y:e.clientY};cv.classList.add('dragging');}
+ else if(pointers.size===2){const a=[...pointers.values()];pinchState={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,zoom:viewZoom};dragState=null;}
+});
+cv.addEventListener('pointermove',e=>{
+ if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===2&&pinchState){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);viewZoom=Math.max(.3,Math.min(5,pinchState.zoom*d/pinchState.distance));render();showGuides();return;}
+ if(!dragState||dragState.id!==e.pointerId)return;
+ const dx=e.clientX-dragState.x,dy=e.clientY-dragState.y;dragState.x=e.clientX;dragState.y=e.clientY;
+ const w=cv.getBoundingClientRect().width;let yaw=(+$('yaw').value+dx/w*360)%360;if(yaw<0)yaw+=360;
+ setRange('yaw',yaw);const h=cv.getBoundingClientRect().height||w;
+ let lean=(+$('lean').value+dy/h*360)%360;if(lean<0)lean+=360;
+ setRange('lean',lean);render();showGuides();
+});
+function endPointer(e){pointers.delete(e.pointerId);if(pointers.size<2)pinchState=null;if(dragState&&dragState.id===e.pointerId)dragState=null;if(!pointers.size)cv.classList.remove('dragging');}
+cv.addEventListener('pointerup',endPointer);cv.addEventListener('pointercancel',endPointer);cv.addEventListener('lostpointercapture',endPointer);
+cv.addEventListener('wheel',e=>{if(!e.altKey)return;e.preventDefault();zoomBy(Math.exp(-e.deltaY*.002))},{passive:false});
+function resetView(){
+ viewZoom=1;viewPanX=0;viewPanY=0;
+ setRange('yaw',45);setRange('lean',0);
+ if(ringTimer)clearTimeout(ringTimer);
+ if(ringFadeFrame)cancelAnimationFrame(ringFadeFrame);
+ ringFadeFrame=null;ringAlpha=0;ringAnimTo=0;ringMode='both';
+ render();
+}
+cv.addEventListener('dblclick',e=>{e.preventDefault();resetView()});
+$('resetView').addEventListener('click',resetView);
+// A wrapped range: dragging beyond either edge continues from the opposite edge.
+const yawSlider=$('yaw');let yawDrag=null;
+yawSlider.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();yawSlider.setPointerCapture(e.pointerId);yawDrag={id:e.pointerId,x:e.clientX,value:+yawSlider.value};});
+yawSlider.addEventListener('pointermove',e=>{if(!yawDrag||yawDrag.id!==e.pointerId)return;const w=yawSlider.getBoundingClientRect().width||1;let v=(yawDrag.value+(e.clientX-yawDrag.x)/w*360)%360;if(v<0)v+=360;yawSlider.value=v;$('v_yaw').textContent=Math.round(v);render();showGuides()});
+yawSlider.addEventListener('pointerup',e=>{if(yawDrag&&yawDrag.id===e.pointerId)yawDrag=null});yawSlider.addEventListener('pointercancel',()=>yawDrag=null);
+yawSlider.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();let v=(+yawSlider.value+(e.key==='ArrowRight'?1:-1)+360)%360;setRange('yaw',v);render();showGuides()}});
+// Figure tilt uses the same wrapped, endless slider behaviour as Rotation.
+const leanSlider=$('lean');let leanDrag=null;
+leanSlider.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();leanSlider.setPointerCapture(e.pointerId);leanDrag={id:e.pointerId,x:e.clientX,value:+leanSlider.value};});
+leanSlider.addEventListener('pointermove',e=>{if(!leanDrag||leanDrag.id!==e.pointerId)return;const w=leanSlider.getBoundingClientRect().width||1;let v=(leanDrag.value+(e.clientX-leanDrag.x)/w*360)%360;if(v<0)v+=360;leanSlider.value=v;$('v_lean').textContent=Math.round(v);render();showGuides()});
+leanSlider.addEventListener('pointerup',e=>{if(leanDrag&&leanDrag.id===e.pointerId)leanDrag=null});leanSlider.addEventListener('pointercancel',()=>leanDrag=null);
+leanSlider.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();let v=(+leanSlider.value+(e.key==='ArrowRight'?1:-1)+360)%360;setRange('lean',v);render();showGuides()}});
+
+$('sphFaces').addEventListener('input',()=>{
+ const names=['Tetrahedron · 4 faces','Cube · 6 faces','Octahedron · 8 faces','Dodecahedron · 12 faces','Icosahedron · 20 faces'];
+ $('v_sphFaces').textContent=names[+$('sphFaces').value]||names[4];
+});
+$('sphFaces').dispatchEvent(new Event('input'));
+function setLabel(id,text){const sp=$(id).closest('label').querySelector('span');if(!sp.dataset.orig)sp.dataset.orig=sp.firstChild.nodeValue;sp.firstChild.nodeValue=text===null?sp.dataset.orig:text+' ';}
+function updateSymmetryControls(){
+ const mode=$('symType').value,sph=mode==='spherical';
+ setLabel('legs',sph?'Vertex spikes':null);setLabel('arms',sph?'Face spikes':null);setLabel('apps',sph?'Edge spikes':null);
+ setLabel('len',sph?'Spike length':null);setLabel('seg',sph?'Spike segments':null);
+ document.querySelectorAll('.mode-control').forEach(el=>{
+  const modes=(el.dataset.modes||'').split(/\s+/);
+  el.hidden=!modes.includes(mode);
+ });
+}
+$('symType').addEventListener('change',()=>{updateSymmetryControls();cachedKey='';render()});
+updateSymmetryControls();
 ids.forEach(k=>$(k).addEventListener('input',render));
+$('yaw').addEventListener('input',()=>showGuides());$('lean').addEventListener('input',()=>showGuides());
 function randLimbs(){
  const rn=mk(((+$('seed').value||1)*2654435761)>>>0),pick=a=>a[Math.floor(rn()*a.length)];
  $('legs').value=pick([1,2,2,3,3,4]);$('arms').value=pick([0,1,1,2,2,3]);$('apps').value=pick([0,0,1,1,2,3]);
@@ -386,7 +797,7 @@ function randLimbs(){
 }
 $('pal').onchange=$('flt').onchange=render;
 $('seed').oninput=()=>{if($('rl').checked)randLimbs();render()};
-$('new').onclick=()=>{$('seed').value=Math.floor(Math.random()*99999)+1;if($('rl').checked)randLimbs();render()};
+$('new').onclick=()=>{$('seed').value=Math.floor(Math.random()*99999)+1;if($('rl').checked)randLimbs();viewZoom=1;viewPanX=viewPanY=0;cachedKey='';render()};
 $('save').onclick=()=>{const a=document.createElement('a');a.download='blob-'+$('seed').value+'.png';a.href=cv.toDataURL('image/png');a.click()};
 $('seed').value=Math.floor(Math.random()*99999)+1;
 randLimbs();
