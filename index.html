@@ -78,8 +78,8 @@ input[type=range]{width:100%;accent-color:var(--acc);margin:3px 0 1px;cursor:poi
    <button id="save">PNG</button>
    <button id="resetView">Reset view</button>
    <div class="mode-switch" role="group" aria-label="Interface mode">
-    <button class="mode-button" type="button" data-interface-mode="simple" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4l5 5M13 6l5 5M4 20l5-1 10-10-4-4L5 15l-1 5z"/><path d="M14 3l1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg><span>Simple</span></button>
-    <button class="mode-button" type="button" data-interface-mode="advanced" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 4v4M15 10v4M10 16v4"/></svg><span>Advanced</span></button>
+    <button class="mode-button" type="button" data-interface-mode="simple" aria-pressed="true"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil preview-icon"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg><span>Simple</span></button>
+    <button class="mode-button" type="button" data-interface-mode="advanced" aria-pressed="false"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sliders-horizontal preview-icon"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg><span>Advanced</span></button>
    </div>
   </div>
   <div class="control-grid">
@@ -1226,16 +1226,4 @@ render();
    const r = await fetch('/api/likes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
    const d = await r.json().catch(() => ({}));
    if (!r.ok) throw d;
-   count = d.count; show(count); store.set();
-  } catch (e) {
-   count = Math.max(0, count - 1); show(count); setLiked(false);
-   msg.textContent = e && e.error === 'rate' ? 'Too many likes from your network today.' : e && e.error === 'captcha' ? 'Captcha check failed, please try again.' : 'Something went wrong, please try again.';
-  }
-  busy = false;
- });
-
- load();
-})();
-</script>
-</body>
-</html> 
+   count = d.count; sh
