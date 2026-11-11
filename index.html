@@ -782,25 +782,37 @@ function showGuides(){
 function setRange(id,value){const el=$(id),min=+el.min,max=+el.max;el.value=Math.max(min,Math.min(max,value));const label=$('v_'+id);if(label)label.textContent=el.value;}
 function zoomBy(factor){viewZoom=Math.max(.3,Math.min(5,viewZoom*factor));render();showGuides();}
 // Drag directly on the canvas: horizontal = endless rotation, vertical = figure tilt.
+// On release, both axes keep moving briefly and ease to a stop.
 const pointers=new Map();let dragState=null,pinchState=null;
+let inertia={yaw:0,lean:0,last:0,raf:0};
+function stopInertia(){if(inertia.raf)cancelAnimationFrame(inertia.raf);inertia.raf=0;inertia.yaw=0;inertia.lean=0;}
+function runInertia(){
+ inertia.raf=0;let now=performance.now(),dt=Math.min(32,now-inertia.last||16);inertia.last=now;
+ const decay=Math.pow(.91,dt/16.67);inertia.yaw*=decay;inertia.lean*=decay;
+ const w=cv.getBoundingClientRect().width||1,h=cv.getBoundingClientRect().height||w;
+ let yaw=(+$('yaw').value+inertia.yaw*dt/w*360)%360;if(yaw<0)yaw+=360;
+ let lean=(+$('lean').value+inertia.lean*dt/h*360)%360;if(lean<0)lean+=360;
+ setRange('yaw',yaw);setRange('lean',lean);render();showGuides();
+ if(Math.abs(inertia.yaw)+Math.abs(inertia.lean)>.012)inertia.raf=requestAnimationFrame(runInertia);else stopInertia();
+}
 cv.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button!==0)return;
- e.preventDefault();cv.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
- if(pointers.size===1){dragState={id:e.pointerId,x:e.clientX,y:e.clientY};cv.classList.add('dragging');}
+ stopInertia();e.preventDefault();cv.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1){const now=performance.now();dragState={id:e.pointerId,x:e.clientX,y:e.clientY,time:now,lastMove:now,vy:0,vl:0};cv.classList.add('dragging');}
  else if(pointers.size===2){const a=[...pointers.values()];pinchState={distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,zoom:viewZoom};dragState=null;}
 });
 cv.addEventListener('pointermove',e=>{
  if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
  if(pointers.size===2&&pinchState){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);viewZoom=Math.max(.3,Math.min(5,pinchState.zoom*d/pinchState.distance));render();showGuides();return;}
  if(!dragState||dragState.id!==e.pointerId)return;
- const dx=e.clientX-dragState.x,dy=e.clientY-dragState.y;dragState.x=e.clientX;dragState.y=e.clientY;
- const w=cv.getBoundingClientRect().width;let yaw=(+$('yaw').value+dx/w*360)%360;if(yaw<0)yaw+=360;
- setRange('yaw',yaw);const h=cv.getBoundingClientRect().height||w;
- let lean=(+$('lean').value+dy/h*360)%360;if(lean<0)lean+=360;
- setRange('lean',lean);render();showGuides();
+ const now=performance.now(),elapsed=Math.max(1,now-dragState.time),dx=e.clientX-dragState.x,dy=e.clientY-dragState.y;dragState.x=e.clientX;dragState.y=e.clientY;dragState.time=now;if(dx!==0||dy!==0)dragState.lastMove=now;
+ const w=cv.getBoundingClientRect().width||1,h=cv.getBoundingClientRect().height||w;
+ const vy=dx/elapsed,vl=dy/elapsed;dragState.vy=dragState.vy*.35+vy*.65;dragState.vl=dragState.vl*.35+vl*.65;
+ let yaw=(+$('yaw').value+dx/w*360)%360;if(yaw<0)yaw+=360;setRange('yaw',yaw);
+ let lean=(+$('lean').value+dy/h*360)%360;if(lean<0)lean+=360;setRange('lean',lean);render();showGuides();
 });
-function endPointer(e){pointers.delete(e.pointerId);if(pointers.size<2)pinchState=null;if(dragState&&dragState.id===e.pointerId)dragState=null;if(!pointers.size)cv.classList.remove('dragging');}
-cv.addEventListener('pointerup',endPointer);cv.addEventListener('pointercancel',endPointer);cv.addEventListener('lostpointercapture',endPointer);
+function endPointer(e,allowInertia=false){pointers.delete(e.pointerId);if(pointers.size<2)pinchState=null;if(dragState&&dragState.id===e.pointerId){const age=performance.now()-dragState.lastMove;const fade=age>=100?0:Math.exp(-age/35);inertia.yaw=allowInertia?dragState.vy*fade:0;inertia.lean=allowInertia?dragState.vl*fade:0;dragState=null;if(Math.abs(inertia.yaw)+Math.abs(inertia.lean)>.025){inertia.last=performance.now();inertia.raf=requestAnimationFrame(runInertia);}}if(!pointers.size)cv.classList.remove('dragging');}
+cv.addEventListener('pointerup',e=>endPointer(e,true));cv.addEventListener('pointercancel',e=>endPointer(e,false));cv.addEventListener('lostpointercapture',e=>endPointer(e,false));
 cv.addEventListener('wheel',e=>{if(!e.altKey)return;e.preventDefault();zoomBy(Math.exp(-e.deltaY*.002))},{passive:false});
 // Show the zoom tip once on desktop; the persistent hint below the canvas remains available afterwards.
 (function initZoomWelcome(){
@@ -1184,46 +1196,4 @@ render();
  function loadTurnstile() {
   if (!TS_SITEKEY) return;
   const s = document.createElement('script');
-  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-  s.async = true;
-  document.head.appendChild(s);
- }
- function getToken() {
-  if (!TS_SITEKEY || !window.turnstile) return Promise.resolve('');
-  return new Promise((resolve, reject) => {
-   tsDone = resolve;
-   tsFail = () => reject(new Error('captcha'));
-   if (tsId === null) {
-    tsId = turnstile.render('#ts', {
-     sitekey: TS_SITEKEY, execution: 'execute', appearance: 'interaction-only',
-     callback: t => tsDone && tsDone(t), 'error-callback': () => tsFail && tsFail(), 'timeout-callback': () => tsFail && tsFail()
-    });
-   } else turnstile.reset(tsId);
-   turnstile.execute(tsId);
-  });
- }
-
- async function load() {
-  try {
-   const r = await fetch('/api/likes', { cache: 'no-store' });
-   if (!r.ok) throw new Error('no backend');
-   const d = await r.json();
-   count = d.count;
-   setLiked(!!d.liked || store.get());
-   if (d.liked) store.set();
-   btn.hidden = false;
-   show(count);
-   loadTurnstile();
-  } catch (e) { /* бэкенда нет (например, файл открыт локально): кнопка просто не показывается */ }
- }
-
- btn.addEventListener('click', async () => {
-  if (liked || busy) return;
-  busy = true; msg.textContent = '';
-  burst(); setLiked(true); count++; show(count);
-  try {
-   const token = await getToken();
-   const r = await fetch('/api/likes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
-   const d = await r.json().catch(() => ({}));
-   if (!r.ok) throw d;
-   count = d.count; sh
+  s.src = 'https://challenges.cloudflare.com
