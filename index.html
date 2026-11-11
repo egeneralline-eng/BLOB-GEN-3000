@@ -11,7 +11,17 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 .wrap{max-width:1540px;margin:0 auto;padding:16px;display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
 .stage{flex:1 1 400px;min-width:0;position:sticky;top:16px;align-self:flex-start}
-@media(max-width:959px){.wrap{padding:calc(100vw + 12px) 12px 16px}.stage{position:fixed;top:env(safe-area-inset-top,0px);left:12px;right:12px;width:auto!important;height:auto!important;z-index:20;flex:none;background:var(--bg);padding:10px 0 8px}.stage canvas{width:100%;height:auto;aspect-ratio:1}.panel{width:100%}}
+.canvas-wrap{position:relative;width:100%}
+.canvas-hint{display:flex;align-items:center;justify-content:center;gap:9px;width:max-content;max-width:100%;margin:9px auto 0;padding:7px 13px;border:1px solid rgba(255,255,255,.09);border-radius:999px;background:rgba(12,15,19,.72);color:rgba(255,255,255,.82);font-size:12px;letter-spacing:.005em;line-height:1;white-space:nowrap}
+.canvas-hint .hint-part{display:inline-flex;align-items:center;gap:7px}
+.canvas-hint svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.canvas-hint .hint-separator{color:rgba(255,255,255,.35);font-size:14px}
+.zoom-welcome{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;border-radius:12px;background:rgba(0,0,0,.56);z-index:2;cursor:pointer;opacity:0;transition:opacity .55s ease}
+.zoom-welcome.is-visible{opacity:1}.zoom-welcome.is-hiding{opacity:0;pointer-events:none}.zoom-welcome[hidden]{display:none}
+.zoom-welcome-card{max-width:90%;text-align:center;color:rgba(255,255,255,.5);pointer-events:none}
+.zoom-welcome-title{font-size:clamp(30px,4vw,58px);font-weight:750;line-height:1.15;margin-bottom:30px;color:rgba(255,255,255,.5)}
+.zoom-welcome-copy{font-size:clamp(22px,2.6vw,40px);line-height:1.35;font-weight:400;color:rgba(255,255,255,.5)}
+@media(max-width:959px){.canvas-hint,.zoom-welcome{display:none!important}.wrap{padding:calc(100vw + 12px) 12px 16px}.stage{position:fixed;top:env(safe-area-inset-top,0px);left:12px;right:12px;width:auto!important;height:auto!important;z-index:20;flex:none;background:var(--bg);padding:10px 0 8px}.stage canvas{width:100%;height:auto;aspect-ratio:1}.panel{width:100%}}
 canvas{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:12px;border:1px solid var(--line);background:#f4f1ea;touch-action:none;cursor:grab;user-select:none}canvas.dragging{cursor:grabbing}
 .panel{flex:0 0 auto;background:transparent;border:0;border-radius:0;padding:0;display:flex;flex-direction:column;gap:12px;width:100%;max-width:100%}
 @media(min-width:960px){.panel{width:min(610px,48vw)}}
@@ -33,11 +43,30 @@ input[type=range]{width:100%;accent-color:var(--acc);margin:3px 0 1px;cursor:poi
 @media(max-width:480px){.contact-author{gap:7px;padding-left:9px}.contact-author-label{font-size:10px}.contact-socials{gap:3px}.contact-social{width:28px;height:28px}}
 @keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.35)}100%{transform:scale(1)}}@keyframes fly{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
 @media(prefers-reduced-motion:reduce){.like.on .heart,.pt{animation:none}.pt{display:none}}
+/* ── Simple ⇄ Advanced transitions ────────────────────────────────────── */
+[data-anim-unit][hidden]{display:none!important}
+[data-anim-unit].is-animating{overflow:hidden;will-change:height,opacity}
+[data-anim-unit].is-animating>*{flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="wrap">
- <div class="stage"><canvas id="cv" width="900" height="900"></canvas></div>
+ <div class="stage">
+  <div class="canvas-wrap">
+   <canvas id="cv" width="900" height="900"></canvas>
+   <div class="zoom-welcome" id="zoomWelcome" hidden role="dialog" aria-modal="true" aria-labelledby="zoomWelcomeTitle" aria-label="Click to dismiss">
+    <div class="zoom-welcome-card">
+     <div class="zoom-welcome-title" id="zoomWelcomeTitle">Explore your blob</div>
+     <div class="zoom-welcome-copy">Alt+Scroll to zoom<br>Drag the canvas to rotate</div>
+    </div>
+   </div>
+  </div>
+  <div class="canvas-hint" aria-label="Canvas controls">
+   <span class="hint-part"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="1.5" width="9" height="13" rx="4.5"/><path d="M8 4v2"/></svg>Drag to rotate</span>
+   <span class="hint-separator">·</span>
+   <span class="hint-part"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="4.5"/><path d="m10.2 10.2 3.3 3.3M6.8 4.5v4.6M4.5 6.8h4.6"/></svg>Alt + Scroll to zoom</span>
+  </div>
+ </div>
  <div class="panel">
   <div class="topbar">
    <div><h1>BLOB-GEN 3000</h1><div class="brand-sub">Procedural imagination tool</div></div>
@@ -127,7 +156,7 @@ input[type=range]{width:100%;accent-color:var(--acc);margin:3px 0 1px;cursor:poi
       <select class="level-control" data-level="advanced" id="pal"><option value="ink">Black</option><option value="gray">Shades of gray</option><option value="col">Muted colors</option></select>
       <label class="chk level-control" data-level="advanced"><input type="checkbox" id="flt" checked> Rejection</label>
      </div>
-     <div id="info"></div>
+     <div id="info" class="level-control" data-level="advanced"></div>
     </div>
    </section>
   </div>
@@ -621,7 +650,7 @@ function tri(x0,y0,d0,x1,y1,d1,x2,y2,d2,r,g,b){
   for(let x=xs;x<=xe;x++,i++,d+=gx){if(d>zb[i]){zb[i]=d;const j=i*4;D[j]=r;D[j+1]=g;D[j+2]=b}}
  }
 }
-function zrender(res,P){
+function zrender(res,P,transparent=false){
  zb.fill(-1e9);
  const H=W2/2,K=H*.95;
  for(const t of res.tris){
@@ -634,8 +663,8 @@ function zrender(res,P){
   if(zb[i]>-1e8){r=D[j];g=D[j+1];b=D[j+2];
    const t=(zb[i]-res.dmin)/dr,h=Math.min(1,Math.max(0,P.air*(1-t)*.75));
    r+=(244-r)*h;g+=(241-g)*h;b+=(234-b)*h;
-   r+=(244-r)*op;g+=(241-g)*op;b+=(241-b)*op}
-  D[j]=r;D[j+1]=g;D[j+2]=b;D[j+3]=zb[i]>-1e8?255:0}
+   if(!transparent){r+=(244-r)*op;g+=(241-g)*op;b+=(241-b)*op}}
+  D[j]=r;D[j+1]=g;D[j+2]=b;D[j+3]=zb[i]>-1e8?(transparent?Math.round(255*P.op):255):0}
  bctx.putImageData(img,0,0);
 }
 function draw(c,res,W,P,fill){
@@ -773,6 +802,22 @@ cv.addEventListener('pointermove',e=>{
 function endPointer(e){pointers.delete(e.pointerId);if(pointers.size<2)pinchState=null;if(dragState&&dragState.id===e.pointerId)dragState=null;if(!pointers.size)cv.classList.remove('dragging');}
 cv.addEventListener('pointerup',endPointer);cv.addEventListener('pointercancel',endPointer);cv.addEventListener('lostpointercapture',endPointer);
 cv.addEventListener('wheel',e=>{if(!e.altKey)return;e.preventDefault();zoomBy(Math.exp(-e.deltaY*.002))},{passive:false});
+// Show the zoom tip once on desktop; the persistent hint below the canvas remains available afterwards.
+(function initZoomWelcome(){
+ const tip=$('zoomWelcome'),key='blobgen_zoom_tip_seen';
+ if(!tip||window.matchMedia('(max-width: 959px)').matches)return;
+ let seen=false;try{seen=localStorage.getItem(key)==='1'}catch(e){}
+ if(seen)return;
+ tip.hidden=false;
+ requestAnimationFrame(()=>tip.classList.add('is-visible'));
+ const close=()=>{
+  if(tip.classList.contains('is-hiding'))return;
+  tip.classList.remove('is-visible');tip.classList.add('is-hiding');
+  try{localStorage.setItem(key,'1')}catch(e){}
+  tip.addEventListener('transitionend',()=>{tip.hidden=true;tip.classList.remove('is-hiding')},{once:true});
+ };
+ tip.addEventListener('click',close);
+})();
 function resetView(){
  viewZoom=1;viewPanX=0;viewPanY=0;
  setRange('yaw',45);setRange('lean',0);
@@ -801,18 +846,198 @@ $('sphFaces').addEventListener('input',()=>{
  $('v_sphFaces').textContent=names[+$('sphFaces').value]||names[4];
 });
 $('sphFaces').dispatchEvent(new Event('input'));
+/* ══ Simple ⇄ Advanced interface transitions ═════════════════════════════
+   Both directions ride an ease-out curve: a sharp start and a long, gentle
+   brake. Opening controls grow up from zero height while fading in from
+   full transparency; closing ones shrink away and fade out. While a control
+   is collapsed to zero height the flex gap that follows it is swallowed by
+   a negative bottom margin, so neighbouring rows glide instead of jumping. */
+const MODE_RANK = { simple: 0, advanced: 1 };
+const EASE_OUT_SIZE = 'cubic-bezier(.33,1,.68,1)';  /* ease-out — sharp launch, long brake */
+const EASE_FADE_IN   = 'cubic-bezier(.4,1,.6,1)';   /* trails the growth a touch */
+const EASE_FADE_OUT  = 'cubic-bezier(.3,.7,.5,1)';  /* dissolves as it shrinks */
+const OPEN_MS = 380, CLOSE_MS = 300;
+let modeBooting = true, modeTargets = new Map();
+
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Does this single control belong in the given interface mode? */
+function controlShown(el, mode) {
+  const level = el.dataset.level || (el.classList.contains('level-control') ? 'advanced' : 'simple');
+  if (MODE_RANK[mode] < MODE_RANK[level]) return false;
+  if (!el.classList.contains('mode-control')) return true;
+  const modes = (el.dataset.modes || '').trim().split(/\s+/).filter(Boolean);
+  return !modes.length || modes.includes($('symType').value);
+}
+
+/* A unit collapses as one block. Usually the label itself; the palette row
+   pairs a <select> with a <label>, so the shared .row is the unit there. */
+function collectUnits() {
+  const units = [];
+  document.querySelectorAll('.level-control,.mode-control').forEach(el => {
+    const u = el.closest('.row') || el;
+    if (units.indexOf(u) < 0) units.push(u);
+  });
+  units.forEach(u => {
+    u.setAttribute('data-anim-unit', '');
+    if (u.dataset.animOpen === undefined) u.dataset.animOpen = '1';
+  });
+  return units;
+}
+
+/* A zero-height flex item still claims a gap, so collapsing a control only
+   really reclaims its space once that gap is swallowed too. One item leaving
+   the flow removes exactly one gap — hence one gap per unit, not two.
+   Returns 0 when the control is the last thing left in its container. */
+function gapToSwallow(unit, targets) {
+  const parent = unit.parentElement;
+  if (!parent) return 0;
+  const cs = getComputedStyle(parent);
+  if (!/flex|grid/.test(cs.display)) return 0;
+  if (cs.display.indexOf('flex') > -1 && cs.flexDirection.indexOf('row') === 0) return 0;
+  const gap = parseFloat(cs.rowGap) || parseFloat(cs.gap) || 0;
+  if (!gap) return 0;
+  const stays = [...parent.children].some(el => {
+    if (el === unit) return false;
+    if (targets.has(el)) return targets.get(el);
+    return !el.hidden && el.dataset.animOpen !== '0';
+  });
+  return stays ? gap : 0;
+}
+
+function releaseUnit(u) {
+  u.classList.remove('is-animating');
+  u.style.height = '';
+  u.style.marginTop = '';
+  u.style.marginBottom = '';
+  u.style.opacity = '';
+}
+
+function runUnit(unit, open, gap, delay) {
+  /* Sample the live look before cancelling — cancelling drops the element
+     back to natural size, and a mid-flight reversal would snap. */
+  const wasHidden = unit.hidden;
+  const live = wasHidden ? null : getComputedStyle(unit);
+  const fromH  = wasHidden ? 0 : unit.getBoundingClientRect().height;
+  const fromO  = wasHidden ? 0 : (parseFloat(live.opacity) || 0);
+  const fromMT = wasHidden ? null : (parseFloat(live.marginTop) || 0);
+  const fromMB = wasHidden ? null : (parseFloat(live.marginBottom) || 0);
+
+  if (unit._size) unit._size.cancel();
+  if (unit._fade) unit._fade.cancel();
+  unit._size = unit._fade = null;
+
+  unit.style.height = '';
+  unit.style.marginTop = '';
+  unit.style.marginBottom = '';
+  unit.style.opacity = '';
+  unit.hidden = false;
+
+  const cs = getComputedStyle(unit);
+  const mt = parseFloat(cs.marginTop) || 0;
+  const mb = parseFloat(cs.marginBottom) || 0;
+  const full = unit.getBoundingClientRect().height;
+
+  const dur = open ? OPEN_MS : CLOSE_MS;
+  /* A freshly revealed unit has no gap yet, so it starts one gap short —
+     otherwise the row would kick by the gap width on the first frame. */
+  const h0  = wasHidden ? 0 : fromH;
+  const h1  = open ? full : 0;
+  const mt0 = wasHidden ? mt : fromMT, mt1 = open ? mt : 0;
+  const mb0 = wasHidden ? mb - gap : fromMB, mb1 = open ? mb : mb - gap;
+
+  unit.classList.add('is-animating');
+  unit.style.height = h0 + 'px';
+  unit.style.marginTop = mt0 + 'px';
+  unit.style.marginBottom = mb0 + 'px';
+  unit.style.opacity = String(fromO);
+
+  const size = unit.animate([
+    { height: h0 + 'px', marginTop: mt0 + 'px', marginBottom: mb0 + 'px' },
+    { height: h1 + 'px', marginTop: mt1 + 'px', marginBottom: mb1 + 'px' }
+  ], { duration: dur, delay, easing: EASE_OUT_SIZE, fill: 'forwards' });
+
+  const fade = unit.animate([
+    { opacity: fromO },
+    { opacity: open ? 1 : 0 }
+  ], {
+    duration: open ? dur * .86 : dur * .62,
+    delay: delay + (open ? 42 : 0),
+    easing: open ? EASE_FADE_IN : EASE_FADE_OUT,
+    fill: 'forwards'
+  });
+
+  unit._size = size;
+  unit._fade = fade;
+  size.onfinish = () => {
+    if (unit._size !== size) return;      /* superseded by a newer switch */
+    if (!open) unit.hidden = true;
+    size.cancel();
+    fade.cancel();
+    unit._size = unit._fade = null;
+    releaseUnit(unit);
+    resettleSections();
+  };
+}
+
+/* A section only disappears once every control inside it is gone. A managed
+   unit counts when its target is open; the #info note also needs text. */
+function resettleSections() {
+  document.querySelectorAll('.control-section').forEach(section => {
+    const box = section.querySelector('.section-controls');
+    if (!box) return;
+    let visible = false;
+    for (const el of box.children) {
+      if (modeTargets.has(el)) {
+        if (!modeTargets.get(el)) continue;
+        if (el.id === 'info' && !el.textContent.trim()) continue;
+        visible = true; continue;
+      }
+      if (!el.hasAttribute('data-anim-unit')) { if (!el.hidden) visible = true; continue; }
+      if (el.dataset.animOpen === '1') visible = true;
+    }
+    if (section.hidden !== !visible) section.hidden = !visible;
+  });
+}
+
+function syncInterface(instant) {
+  const mode = document.body.dataset.interfaceMode || 'simple';
+  const units = collectUnits();
+  const targets = new Map();
+  units.forEach(u => {
+    const inside = u.matches('.level-control,.mode-control')
+      ? [u, ...u.querySelectorAll('.level-control,.mode-control')]
+      : [...u.querySelectorAll('.level-control,.mode-control')];
+    targets.set(u, inside.some(el => controlShown(el, mode)));
+  });
+  modeTargets = targets;
+
+  const animate = !instant && !modeBooting && !reducedMotion();
+  const queue = [];
+  units.forEach(u => {
+    const open = targets.get(u);
+    if (u.dataset.animOpen === (open ? '1' : '0')) return;
+    u.dataset.animOpen = open ? '1' : '0';
+    if (!animate) { u.hidden = !open; releaseUnit(u); return; }
+    queue.push([u, open]);
+  });
+
+  if (!animate || !queue.length) { resettleSections(); return; }
+
+  /* opening cascades top-down so the sliders trail their own field out */
+  let i = 0;
+  queue.forEach(([unit, open]) => {
+    const delay = open ? Math.min(i++ * 20, 80) : 0;
+    runUnit(unit, open, gapToSwallow(unit, targets), delay);
+  });
+}
+
 function setLabel(id,text){const sp=$(id).closest('label').querySelector('span');if(!sp.dataset.orig)sp.dataset.orig=sp.firstChild.nodeValue;sp.firstChild.nodeValue=text===null?sp.dataset.orig:text+' ';}
 function updateSymmetryControls(){
  const mode=$('symType').value,sph=mode==='spherical';
  setLabel('legs',sph?'Vertex spikes':null);setLabel('arms',sph?'Face spikes':null);setLabel('apps',sph?'Edge spikes':null);
  setLabel('len',sph?'Spike length':null);setLabel('seg',sph?'Spike segments':null);
- const activeMode=document.body.dataset.interfaceMode||'simple';
- const levels={simple:0,advanced:1};
- document.querySelectorAll('.mode-control').forEach(el=>{
-  const modes=(el.dataset.modes||'').split(/\s+/);
-  const required=levels[el.dataset.level||'simple'];
-  el.hidden=!modes.includes(mode)||levels[activeMode]<required;
- });
+ syncInterface();
 }
 $('symType').addEventListener('change',()=>{updateSymmetryControls();cachedKey='';render()});
 updateSymmetryControls();
@@ -826,7 +1051,18 @@ function randLimbs(){
 $('pal').onchange=$('flt').onchange=render;
 $('seed').oninput=()=>{if($('rl').checked)randLimbs();render()};
 $('new').onclick=()=>{$('seed').value=Math.floor(Math.random()*99999)+1;if($('rl').checked)randLimbs();viewZoom=1;viewPanX=viewPanY=0;cachedKey='';render()};
-$('save').onclick=()=>{const a=document.createElement('a');a.download='blob-'+$('seed').value+'.png';a.href=cv.toDataURL('image/png');a.click()};
+$('save').onclick=()=>{
+ const P=params();
+ P.fixedScale=cachedBodies?cachedBodies._viewScale:1;
+ P.zoom=viewZoom;P.panX=viewPanX;P.panY=viewPanY;
+ const result=project(cachedBodies||generate(P,+$('seed').value||1,0),P);
+ // Export the renderer's native 2x canvas (1800×1800), without the screen background or guides.
+ zrender(result,P,true);
+ const a=document.createElement('a');
+ a.download='blob-'+$('seed').value+'.png';
+ a.href=big.toDataURL('image/png');
+ a.click();
+};
 $('seed').value=Math.floor(Math.random()*99999)+1;
 randLimbs();
 
@@ -890,32 +1126,17 @@ document.querySelectorAll('label > span > b').forEach(bEl => {
 
 // Interface modes only control visibility; all underlying values remain intact.
 const modeButtons=[...document.querySelectorAll('[data-interface-mode]')];
-const levelRank={simple:0,advanced:1};
 function setInterfaceMode(mode){
- if(!(mode in levelRank))mode='simple';
+ if(!(mode in MODE_RANK))mode='simple';
  document.body.dataset.interfaceMode=mode;
  modeButtons.forEach(btn=>btn.setAttribute('aria-pressed',btn.dataset.interfaceMode===mode?'true':'false'));
- document.querySelectorAll('.level-control').forEach(el=>{
-  const level=el.dataset.level||'advanced';
-  el.hidden=levelRank[mode]<levelRank[level];
- });
- updateSymmetryControls();
- // Hide a section only if every control in it is currently hidden.
- document.querySelectorAll('.control-section').forEach(section=>{
-  const controls=[...section.querySelector('.section-controls').children];
-  controls.forEach(el=>{
-   if(el.id==='info')return;
-   const nested=[...el.querySelectorAll('.level-control,.mode-control')];
-   if(nested.length)el.hidden=nested.every(x=>x.hidden);
-  });
-  const visible=controls.some(el=>!el.hidden&&(el.id!=='info'||!!el.textContent.trim()));
-  section.hidden=!visible;
- });
-
+ syncInterface();
 }
 modeButtons.forEach(btn=>btn.addEventListener('click',()=>setInterfaceMode(btn.dataset.interfaceMode)));
 
+collectUnits();
 setInterfaceMode('simple');
+modeBooting = false;
 render();
 </script>
 <script>
