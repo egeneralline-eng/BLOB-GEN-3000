@@ -76,6 +76,7 @@ input[type=range]{width:100%;accent-color:var(--acc);margin:3px 0 1px;cursor:poi
   <div class="toolbar">
    <button class="p" id="new">New blob</button>
    <button id="save">PNG</button>
+   <button id="saveObj" title="Export 3D mesh (Wavefront OBJ)">OBJ</button>
    <button id="resetView">Reset view</button>
    <div class="mode-switch" role="group" aria-label="Interface mode">
     <button class="mode-button" type="button" data-interface-mode="simple" aria-pressed="true"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil preview-icon"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg><span>Simple</span></button>
@@ -1074,6 +1075,80 @@ $('save').onclick=()=>{
  a.download='blob-'+$('seed').value+'.png';
  a.href=big.toDataURL('image/png');
  a.click();
+};
+// ── OBJ export ───────────────────────────────────────────────────────────
+// Геометрия берётся в «модельном» пространстве (без поворота камеры), с той же
+// тесселяцией кривизны, что и в project(). Y вверх, правосторонняя система,
+// размер нормирован так, что фигура вписана в сферу радиуса 1.
+function bodiesToOBJ(bodies,P,seed){
+ const bulge=P.curve>.01,U=bulge?[.4,.75,1]:null,S=bulge?2:1;
+ let radius=.001;
+ for(const s of bodies)for(const v of s.V)radius=Math.max(radius,Math.hypot(s.c[0]+v[0],s.c[1]+v[1],s.c[2]+v[2]));
+ const k=1/radius,out=['# BLOB-GEN 3000','# seed '+seed,'# Y up, right-handed, fitted to unit sphere'];
+ let base=0,nb=0,nl=0,nTri=0;
+ for(const s of bodies){
+  const map=new Map(),verts=[],faces=[];
+  // модель у вас с осью Y вниз → переворачиваем Y и разворачиваем обход граней
+  const vid=p=>{
+   const x=p[0]*k,y=-p[1]*k,z=p[2]*k,key=x.toFixed(5)+','+y.toFixed(5)+','+z.toFixed(5);
+   let i=map.get(key);if(i===undefined){i=verts.length;verts.push([x,y,z]);map.set(key,i)}
+   return i;
+  };
+  const pushFace=ids=>{
+   const u=ids.filter((v,i)=>v!==ids[(i+1)%ids.length]);
+   if(new Set(u).size>=3)faces.push(u);
+  };
+  const addTri=(p,q,r,N)=>{
+   const ax=q[0]-p[0],ay=q[1]-p[1],az=q[2]-p[2],bx=r[0]-p[0],by=r[1]-p[1],bz=r[2]-p[2];
+   const cx=ay*bz-az*by,cy=az*bx-ax*bz,cz=ax*by-ay*bx;
+   if(cx*cx+cy*cy+cz*cz<1e-18)return;
+   if(cx*N[0]+cy*N[1]+cz*N[2]<0){const t=q;q=r;r=t}
+   pushFace([vid(p),vid(r),vid(q)]);
+  };
+  // Центр тела: тела выпуклые, поэтому «наружу» = от центра. fc.n сознательно не
+  // используется — у платоновых тел он бывает направлен внутрь.
+  const Cb=[0,0,0];for(const v of s.V){Cb[0]+=(s.c[0]+v[0])/s.V.length;Cb[1]+=(s.c[1]+v[1])/s.V.length;Cb[2]+=(s.c[2]+v[2])/s.V.length}
+  for(const fc of s.F){
+   const mm=fc.idx.length,Wp=fc.idx.map(i=>[s.c[0]+s.V[i][0],s.c[1]+s.V[i][1],s.c[2]+s.V[i][2]]);
+   const C=[0,0,0];for(const w of Wp){C[0]+=w[0]/mm;C[1]+=w[1]/mm;C[2]+=w[2]/mm}
+   let nx=0,ny=0,nz=0;
+   for(let i=0;i<mm;i++){const a=Wp[i],b=Wp[(i+1)%mm];nx+=(a[1]-b[1])*(a[2]+b[2]);ny+=(a[2]-b[2])*(a[0]+b[0]);nz+=(a[0]-b[0])*(a[1]+b[1])}
+   const nl=Math.hypot(nx,ny,nz);
+   if(nl<1e-12)continue; // вырожденная грань
+   const sg=(nx*(C[0]-Cb[0])+ny*(C[1]-Cb[1])+nz*(C[2]-Cb[2]))<0?-1:1;
+   const N=[sg*nx/nl,sg*ny/nl,sg*nz/nl];
+   if(!bulge){
+    pushFace((sg<0?Wp:Wp.slice().reverse()).map(vid));
+    continue;
+   }
+   let rad=0;for(const w of Wp)rad+=Math.hypot(w[0]-C[0],w[1]-C[1],w[2]-C[2])/mm;
+   const H=P.curve*.45*rad,B=[];
+   for(let i=0;i<mm;i++)for(let st=0;st<S;st++){const t=st/S,a=Wp[i],b=Wp[(i+1)%mm];B.push([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t])}
+   const M=B.length,rings=U.map(u=>B.map(b=>{const d=H*(1-u*u);return[C[0]+(b[0]-C[0])*u+N[0]*d,C[1]+(b[1]-C[1])*u+N[1]*d,C[2]+(b[2]-C[2])*u+N[2]*d]}));
+   const Cc=[C[0]+N[0]*H,C[1]+N[1]*H,C[2]+N[2]*H];
+   for(let j=0;j<M;j++)addTri(Cc,rings[0][j],rings[0][(j+1)%M],N);
+   for(let r=0;r<rings.length-1;r++)for(let j=0;j<M;j++){
+    const j2=(j+1)%M,p0=rings[r][j],p1=rings[r][j2],q0=rings[r+1][j],q1=rings[r+1][j2];
+    addTri(p0,p1,q1,N);addTri(p0,q1,q0,N);
+   }
+  }
+  if(!faces.length)continue;
+  out.push('o '+(s.limb?'limb_'+(++nl):'body_'+(++nb)),'s off');
+  for(const v of verts)out.push('v '+v[0].toFixed(5)+' '+v[1].toFixed(5)+' '+v[2].toFixed(5));
+  for(const f of faces)out.push('f '+f.map(i=>i+1+base).join(' '));
+  base+=verts.length;nTri+=faces.length;
+ }
+ return out.join('\n')+'\n';
+}
+$('saveObj').onclick=()=>{
+ const P=params(),seed=+$('seed').value||1;
+ const bodies=cachedBodies||generate(P,seed,0);
+ const blob=new Blob([bodiesToOBJ(bodies,P,seed)],{type:'text/plain'});
+ const a=document.createElement('a');
+ a.download='blob-'+seed+'.obj';
+ a.href=URL.createObjectURL(blob);
+ a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
 $('seed').value=Math.floor(Math.random()*99999)+1;
 randLimbs();
