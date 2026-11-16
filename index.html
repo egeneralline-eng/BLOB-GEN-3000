@@ -254,7 +254,11 @@ function generateUnit(P,seed,att){
   const R=rotm(kk(ra[0])*Math.PI/2+gr[0]*tl,kk(ra[1])*Math.PI/2+gr[1]*tl,kk(ra[2])*Math.PI/2+gr[2]*tl);
   return build([x,y,z],R,hx,hy,h,tpF,tone,ue,rk,cs,null);
  }
- function chain(core,sp,sx,aj){
+ // opt (standing legs only): lenMul scales every segment; foot:true makes the last
+ // segment point straight down so its end cap becomes a flat, horizontal sole;
+ // footExtra adds (or removes) length to that last segment only.
+ function chain(core,sp,sx,aj,opt){
+  const lenMul=opt&&opt.lenMul||1,footDown=!!(opt&&opt.foot),footExtra=opt&&opt.footExtra||0;
   const rn=mk(seed*65537+att*977+sp.kind*131+sp.i*7919+11),u=[],gg=[];
   for(let i=0;i<64;i++)u.push(rn());
   for(let i=0;i<16;i++)gg.push(Math.sqrt(-2*Math.log(1-rn()))*Math.cos(6.2832*rn()));
@@ -275,7 +279,10 @@ function generateUnit(P,seed,att){
   for(let j=0;j<ns;j++){
    if(j>0){const tgt=kd===0?[0,1,0]:kd===1?[-.2*sx,.3,.9]:[0,0,0],gr=kd===2?0:.55,sc=kd===2?.7:.3;
     d=nz([d[0]*(1-gr)+tgt[0]*gr+gg[4+j]*sc*sx,d[1]*(1-gr)+tgt[1]*gr+gg[8+j]*sc*.8,d[2]*(1-gr)+tgt[2]*gr+gg[12+j]*sc])}
-   const l=total/ns*(1-.08*j);
+   const isFoot=footDown&&j===ns-1;
+   if(isFoot)d=[0,1,0];
+   else if(footDown&&d[1]<.2)d=nz([d[0],.2,d[2]]); // standing legs never climb upwards
+   const l=Math.max(.01,total/ns*(1-.08*j)*lenMul+(isFoot?footExtra:0));
    const rBase = P.size * (.3 + 0.5 * u[6 + j]);
    const scaleX = 0.5 + 1.5 * u[10 + j];
    const scaleY = 0.5 + 1.5 * u[18 + j];
@@ -319,16 +326,78 @@ function generateUnit(P,seed,att){
   }
   connect(out);
   const core=out.slice(),kinds=[P.legs,P.arms,P.apps];
-  for(let kd=0;kd<3;kd++)for(let i=0;i<kinds[kd];i++){
-   const sp={kind:kd,i,n:kinds[kd]};
-   out.push(...chain(core,sp,1,0),...chain(core,sp,-1,a));
+  // Bilateral figures stand: legs are fitted afterwards so that all of them end on one floor plane.
+  const stand=P.symType==='bilateral'&&P.legs>0;
+  for(let kd=0;kd<3;kd++){
+   if(stand&&kd===0)continue;
+   for(let i=0;i<kinds[kd];i++){
+    const sp={kind:kd,i,n:kinds[kd]};
+    out.push(...chain(core,sp,1,0),...chain(core,sp,-1,a));
+   }
   }
+  if(stand)out._groundY=standOnLegs(out,core,P.legs,a);
+ }
+ // Fits every leg so that its lowest point lies exactly on a common floor (model Y points down).
+ // The floor sits at the average natural leg reach, but never above any other part of the figure,
+ // so only the soles touch it.
+ function standOnLegs(out,core,nLegs,a){
+  const legs=[];
+  for(let i=0;i<nLegs;i++){const sp={kind:0,i,n:nLegs};legs.push([sp,1,0],[sp,-1,a])}
+  const make=(L,m,ex)=>chain(core,L[0],L[1],L[2],{lenMul:m,foot:true,footExtra:ex||0});
+  const lowY=segs=>{let m=-1e9;for(const s of segs)for(const v of s.V)m=Math.max(m,s.c[1]+v[1]);return m};
+  let rest=-1e9;for(const s of out)for(const v of s.V)rest=Math.max(rest,s.c[1]+v[1]);
+  const LO=.3;let sum=0,minReach=-1e9;
+  for(const L of legs){sum+=lowY(make(L,1));minReach=Math.max(minReach,lowY(make(L,LO)))}
+  const floorY=Math.max(sum/legs.length,rest+.02,minReach);
+  for(const L of legs){
+   let lo=LO,hi=1;
+   while(lowY(make(L,hi))<floorY&&hi<64){lo=hi;hi*=2}
+   for(let it=0;it<40;it++){const mid=(lo+hi)/2;if(lowY(make(L,mid))<floorY)lo=mid;else hi=mid}
+   const m=(lo+hi)/2;let segs=make(L,m);
+   // The foot is vertical, so changing its length moves the sole by exactly that amount.
+   const dl=floorY-lowY([segs[segs.length-1]]);
+   if(Math.abs(dl)>1e-9)segs=make(L,m,dl);
+   for(const s of segs)s.leg=true;
+   out.push(...segs);
+  }
+  return floorY;
  }
  const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
  for(const s of out)for(const v of s.V)for(let i=0;i<3;i++){const q=s.c[i]+v[i];lo[i]=Math.min(lo[i],q);hi[i]=Math.max(hi[i],q)}
  const ct=lo.map((l,i)=>(l+hi[i])/2);
  for(const s of out){s.c=s.c.map((q,i)=>q-ct[i]);s.F=makeFaces(s)}
+ if(Number.isFinite(out._groundY)){out._groundY-=ct[1];out._stable=isStable(out,out._groundY)}
  return out;
+}
+// Volume of one convex body (bottom cap, top cap, side quads), via a tetrahedron fan from its centroid.
+function bodyVolume(s){
+ const n=s.n,V=s.V,c=[0,0,0];
+ for(const v of V){c[0]+=v[0]/V.length;c[1]+=v[1]/V.length;c[2]+=v[2]/V.length}
+ const faces=[Array.from({length:n},(_,i)=>i),Array.from({length:n},(_,i)=>n+i)];
+ for(let i=0;i<n;i++){const j=(i+1)%n;faces.push([i,j,n+j,n+i])}
+ let vol=0;
+ for(const f of faces)for(let k=1;k<f.length-1;k++){
+  const a=V[f[0]],b=V[f[k]],d=V[f[k+1]];
+  const ax=a[0]-c[0],ay=a[1]-c[1],az=a[2]-c[2],bx=b[0]-c[0],by=b[1]-c[1],bz=b[2]-c[2],dx=d[0]-c[0],dy=d[1]-c[1],dz=d[2]-c[2];
+  vol+=Math.abs(ax*(by*dz-bz*dy)-ay*(bx*dz-bz*dx)+az*(bx*dy-by*dx))/6;
+ }
+ return{vol,c:[s.c[0]+c[0],s.c[1]+c[1],s.c[2]+c[2]]};
+}
+// Would a solid, uniformly dense copy stand? The centre of mass must project inside the
+// convex hull of the soles' contact points on the floor (XZ plane).
+function isStable(bodies,groundY){
+ let M=0;const com=[0,0,0],pts=[];
+ for(const s of bodies){
+  const b=bodyVolume(s);M+=b.vol;for(let i=0;i<3;i++)com[i]+=b.c[i]*b.vol;
+  if(s.leg)for(const v of s.V)if(s.c[1]+v[1]>=groundY-1e-6)pts.push([s.c[0]+v[0],s.c[2]+v[2]]);
+ }
+ if(!M||pts.length<3)return false;
+ const px=com[0]/M,pz=com[2]/M,H=hull(pts);
+ if(H.length<3)return false;
+ let pos=0,neg=0;
+ for(let i=0;i<H.length;i++){const a=H[i],b=H[(i+1)%H.length];
+  const cr=(b[0]-a[0])*(pz-a[1])-(b[1]-a[1])*(px-a[0]);if(cr>1e-9)pos++;else if(cr<-1e-9)neg++;}
+ return !(pos&&neg);
 }
 
 
@@ -687,7 +756,8 @@ function good(polys,P){
  draw(octx,polys,96,P,true);
  const d=octx.getImageData(0,0,96,96).data,N=96,f=new Uint8Array(N*N);
  let cnt=0,x0=N,x1=0,y0=N,y1=0;
- for(let i=0;i<N*N;i++)if(d[i*4]<128){f[i]=1;cnt++;const x=i%N,y=(i/N)|0;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+ // The silhouette is opaque black on a cleared (transparent) canvas: count opaque pixels.
+ for(let i=0;i<N*N;i++)if(d[i*4+3]>=128){f[i]=1;cnt++;const x=i%N,y=(i/N)|0;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
  if(!cnt)return false;
  let best=0;const seen=new Uint8Array(N*N);
  for(let i=0;i<N*N;i++){if(!f[i]||seen[i])continue;let sz=0;const st=[i];seen[i]=1;
@@ -716,17 +786,28 @@ function render(){
   if($('flt').checked){
    ok=false;
    const maxAttempts=(P.symType==='bilateral'||P.symType==='asymmetry')?80:24;
-   for(att=0;att<maxAttempts;att++){if(good(project(generate(ref,seed,att),ref,true),ref)){ok=true;break}}
-   if(!ok)att=0;
+   // Standing bilateral figures must also balance on their soles; if no variant does, keep the first good-looking one.
+   // Preference: good-looking and stable > stable > good-looking > first variant.
+   const needStable=P.symType==='bilateral'&&P.legs>0;let firstGood=-1,firstStable=-1;
+   for(att=0;att<maxAttempts;att++){
+    const looks=good(project(generate(ref,seed,att),ref,true),ref);
+    const stands=!needStable||!!generate(P,seed,att)._stable;
+    if(looks&&stands){ok=true;break}
+    if(looks&&firstGood<0)firstGood=att;
+    if(needStable&&stands&&firstStable<0)firstStable=att;
+   }
+   if(!ok)att=firstStable>=0?firstStable:firstGood>=0?firstGood:0;
   }
   cachedBodies=generate(P,seed,att);cachedKey=key;
   let radius=.001,minY=1e9,maxY=-1e9;
   for(const b of cachedBodies)for(const v of b.V){radius=Math.max(radius,Math.hypot(b.c[0]+v[0],b.c[1]+v[1],b.c[2]+v[2]));const yy=b.c[1]+v[1];minY=Math.min(minY,yy);maxY=Math.max(maxY,yy)}
   cachedBodies._viewScale=.82/radius;
   // A fixed world-horizontal guide sits just below the model's lower extent.
-  cachedBodies._floorY=maxY-.10*(maxY-minY);
+  cachedBodies._floorY=Number.isFinite(cachedBodies._groundY)?cachedBodies._groundY:maxY-.10*(maxY-minY);
   $('info').textContent=$('flt').checked?(ok?`Matched variation #${att+1}`:'No match found, showing first variant'):'';
   if(P.symType==='spherical')$('info').textContent+=' · '+(P._solidName||'Platonic solid');
+  if(cachedBodies._groundY!==undefined)$('info').textContent+=(cachedBodies._stable?' · Stands on its legs':' · Legs reach the floor, but it would tip over');
+  $('info').textContent=$('info').textContent.replace(/^ · /,'');
  }
  P.fixedScale=cachedBodies._viewScale;P.zoom=viewZoom;P.panX=viewPanX;P.panY=viewPanY;
  draw(ctx,project(cachedBodies,P),900,P,false);
